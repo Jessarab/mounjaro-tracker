@@ -270,6 +270,28 @@ export default function App() {
     .filter((c) => c.monto && c.descuento_porcentaje)
     .reduce((sum, c) => sum + Math.round((c.monto * c.descuento_porcentaje) / (100 - c.descuento_porcentaje)), 0);
 
+  function getDiasRestantes(ultimoUso) {
+    if (!ultimoUso) return null;
+    const dias = Math.floor((Date.now() - new Date(ultimoUso)) / 86400000);
+    return 35 - dias;
+  }
+
+  function getUrgencia(dr) {
+    if (dr === null) return { color: "#71717a", bg: "rgba(113,113,122,0.08)", border: "rgba(113,113,122,0.2)", label: null };
+    if (dr <= 0)  return { color: "#f87171", bg: "rgba(239,68,68,0.15)",  border: "rgba(239,68,68,0.5)",  label: "⛔ Vencida" };
+    if (dr <= 7)  return { color: "#f87171", bg: "rgba(239,68,68,0.10)",  border: "rgba(239,68,68,0.4)",  label: dr + "d restantes" };
+    if (dr <= 15) return { color: "#fbbf24", bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.3)", label: dr + "d restantes" };
+    return          { color: "#34d399", bg: "rgba(52,211,153,0.07)",  border: "rgba(52,211,153,0.2)", label: dr + "d restantes" };
+  }
+
+  function sortByUrgency(list) {
+    return [...list].sort((a, b) => {
+      const da = getDiasRestantes(a.ultimo_uso) ?? 999;
+      const db = getDiasRestantes(b.ultimo_uso) ?? 999;
+      return da - db;
+    });
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white" style={{ fontFamily: "system-ui, sans-serif" }}>
       <style>{`
@@ -545,17 +567,17 @@ export default function App() {
                 <div key={farm}>
                   <div style={{ fontSize: 11, color: "#71717a", fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>{farm === "San Pablo" ? "🏪" : "🏥"} {farm}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {tf.map((t) => {
-                      const diasDesde = t.ultimo_uso ? Math.floor((Date.now() - new Date(t.ultimo_uso)) / 86400000) : null;
-                      const vencida = diasDesde !== null && diasDesde > 35;
+                    {sortByUrgency(tf).map((t) => {
+                      const dr = getDiasRestantes(t.ultimo_uso);
+                      const urg = getUrgencia(dr);
                       return (
-                        <div key={t.id} className="glass" onClick={() => setModalTarjeta(t)} style={{ borderRadius: 20, padding: 16, cursor: "pointer", borderColor: vencida ? "rgba(239,68,68,0.4)" : undefined }}>
+                        <div key={t.id} onClick={() => setModalTarjeta(t)} style={{ borderRadius: 20, padding: 16, cursor: "pointer", background: urg.bg, border: "1px solid " + urg.border }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                            <div>
+                            <div style={{ flex: 1 }}>
                               <div style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 600, color: "#e4e4e7" }}>{t.numero}</div>
-                              <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                              <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
                                 <PillBadge color={farm === "San Pablo" ? "purple" : "red"}>{t.dosis}</PillBadge>
-                                {vencida && <PillBadge color="red">⚠ Vencida</PillBadge>}
+                                {urg.label && <span style={{ fontSize: 11, fontWeight: 700, color: urg.color }}>{dr <= 0 ? "⛔" : dr <= 7 ? "🔴" : dr <= 15 ? "🟡" : "🟢"} {urg.label}</span>}
                               </div>
                             </div>
                             <div style={{ textAlign: "right" }}>
@@ -569,7 +591,7 @@ export default function App() {
                           <ProgressBar usos={t.usos} dosis={t.dosis} />
                           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11, color: "#52525b" }}>
                             <span>{t.usos} uso{t.usos !== 1 ? "s" : ""}</span>
-                            {diasDesde !== null && <span>Último: hace {diasDesde}d {diasDesde <= 35 ? `· ${35 - diasDesde}d restantes` : ""}</span>}
+                            <span>Último uso: {t.ultimo_uso}</span>
                           </div>
                         </div>
                       );
